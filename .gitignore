@@ -1,0 +1,5 @@
+dist/
+build/
+readme.md
+*.txt
+*.ico
