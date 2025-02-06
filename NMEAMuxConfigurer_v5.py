@@ -12,6 +12,7 @@ class SerialApp:
         # Переменные
         self.serial_port = None
         self.running = False
+        self.selected_channel = tk.IntVar(value=1)  # Выбранный канал по умолчанию
 
         # 1. Выбор COM-порта и кнопка отправки $MKHALT
         frame1 = tk.Frame(root, padx=10, pady=5)
@@ -29,6 +30,12 @@ class SerialApp:
         self.send_mkhalt_button = tk.Button(frame1, text="Отправить $MKHALT", command=self.send_mkhalt, state="disabled")
         self.send_mkhalt_button.pack(side="left", padx=5)
 
+        self.download_from_mux = tk.Button(frame1, text="Скачать конфигурацию", command=self.send_mkhalt, state="disabled")
+        self.download_from_mux.pack(side="left", padx=5)
+        
+        self.upload_to_mux = tk.Button(frame1, text="Загрузить конфигурацию", command=self.send_mkhalt, state="disabled")
+        self.upload_to_mux.pack(side="left", padx=5)
+
         # 2. Ввод текста и кнопка отправки
         frame2 = tk.Frame(root, padx=10, pady=5)
         frame2.pack(fill="x")
@@ -36,7 +43,7 @@ class SerialApp:
         self.input_entry = tk.Entry(frame2, width=50)
         self.input_entry.pack(side="left", padx=5)
 
-        self.send_text_button = tk.Button(frame2, text="Отправить", command=self.send_text, state="disabled")
+        self.send_text_button = tk.Button(frame2, text="Отправить команду", command=self.send_text, state="disabled")
         self.send_text_button.pack(side="left", padx=5)
 
         # 3. Поле для приема данных
@@ -47,12 +54,12 @@ class SerialApp:
         self.output_text.pack(fill="both", expand=True)
 
         # 4.1 Кнопки "Канал 1" – "Канал 8"
-        self.channel_frame = tk.Frame(root)
-        self.channel_frame.pack(fill="x", pady=5)
+        self.channel_frame = tk.LabelFrame(root, text="Выбор канала")
+        self.channel_frame.pack(fill="x", pady=5, padx=10)
 
         for i in range(1, 9):
-            btn = tk.Button(self.channel_frame, text=f"Канал {i}", width=10)
-            btn.pack(side="left", padx=2)
+            rb = ttk.Radiobutton(self.channel_frame, text=f"Канал {i}", variable=self.selected_channel, value=i)
+            rb.pack(side="left", padx=5)
 
         # 4.2 Выбор скорости и поле "Период"
         self.config_frame = tk.Frame(root)
@@ -73,7 +80,7 @@ class SerialApp:
 
         # 4.3 Список NMEA 0183 предложений с 5 чекбоксами в строке и прокруткой
         self.nmea_frame = tk.Frame(root)
-        self.nmea_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        self.nmea_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         self.nmea_canvas = tk.Canvas(self.nmea_frame)
         self.nmea_scrollbar = ttk.Scrollbar(self.nmea_frame, orient="vertical", command=self.nmea_canvas.yview)
@@ -93,9 +100,14 @@ class SerialApp:
         # Заголовок таблицы
         header_frame = tk.Frame(self.nmea_scrollable_frame)
         header_frame.pack(fill="x", pady=2)
-        tk.Label(header_frame, text="Sentence ID", width=20, anchor="w").pack(side="left", padx=5)
-        for i in range(1, 6):
-            tk.Label(header_frame, text=f"Опция {i}", width=10).pack(side="left")
+        tk.Label(header_frame, text="Sentence ID", width=10, anchor="w").pack(side="left", padx=5)
+        tk.Label(header_frame, text=f"In", width=5).pack(side="left", padx=7)
+        tk.Label(header_frame, text=f"Out", width=5).pack(side="left", padx=7)
+        tk.Label(header_frame, text=f"Conv", width=5).pack(side="left", padx=7)
+        tk.Label(header_frame, text=f"Forced", width=5).pack(side="left", padx=7)
+        tk.Label(header_frame, text=f"Calc", width=5).pack(side="left", padx=7)
+        # for i in range(1, 6):
+        #     tk.Label(header_frame, text=f"Опция {i}", width=10).pack(side="left")
 
         # Данные NMEA
         self.nmea_sentences = [
@@ -107,7 +119,7 @@ class SerialApp:
             row_frame = tk.Frame(self.nmea_scrollable_frame)
             row_frame.pack(fill="x", pady=2)
 
-            tk.Label(row_frame, text=sentence, width=20, anchor="w").pack(side="left", padx=5)
+            tk.Label(row_frame, text=sentence, width=10, anchor="w").pack(side="left", padx=5)
 
             row_vars = []
             for _ in range(5):
