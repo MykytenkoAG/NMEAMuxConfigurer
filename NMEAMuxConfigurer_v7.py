@@ -3,10 +3,13 @@ from tkinter import ttk
 import serial
 import serial.tools.list_ports
 import threading
+import ReadConfig
+from ReadConfig import data
 
 class SerialApp:
-    def __init__(self, root):
+    def __init__(self, root, data):
         self.root = root
+        self.data = data
         self.root.title("MUX Configurer")
         
         # Переменные
@@ -108,9 +111,11 @@ class SerialApp:
         tk.Label(header_frame, text=f"Calc", width=5).pack(side="left", padx=7)
 
         # Данные NMEA
-        self.nmea_sentences = [
-            "GGA", "GLL", "GSA", "GSV", "RMC", "VTG", "ZDA", "HDG", "HDT", "DBT"
-        ]
+        self.nmea_sentences = []
+
+        for key in data[0].keys():
+            if(key not in {"ChannelNumber", "B", "T"}):
+                self.nmea_sentences.append(key)
 
         self.nmea_vars = []
         for sentence in self.nmea_sentences:
@@ -192,5 +197,5 @@ if __name__ == "__main__":
     import ReadConfig
     
     root = tk.Tk()
-    app = SerialApp(root)
+    app = SerialApp(root, data)
     root.mainloop()
