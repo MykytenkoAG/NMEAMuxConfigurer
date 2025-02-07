@@ -130,6 +130,8 @@ class SerialApp:
                 row_vars.append(var)
                 chk = tk.Checkbutton(row_frame, variable=var)
                 chk.pack(side="left", padx=5)
+                if(data[0][sentence][_]=="1"):
+                    chk.select()
 
             self.nmea_vars.append(row_vars)
 
