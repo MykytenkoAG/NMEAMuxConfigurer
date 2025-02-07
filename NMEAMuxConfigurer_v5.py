@@ -7,7 +7,7 @@ import threading
 class SerialApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("COM Port Viewer")
+        self.root.title("MUX Configurer")
         
         # Переменные
         self.serial_port = None
@@ -70,7 +70,7 @@ class SerialApp:
 
         self.speed_combobox = ttk.Combobox(self.config_frame, values=["4800", "9600", "38400", "115200"], state="readonly")
         self.speed_combobox.pack(side="left", padx=5)
-        self.speed_combobox.current(1)  # По умолчанию 9600
+        self.speed_combobox.current(0)  # По умолчанию 4800
 
         self.period_label = tk.Label(self.config_frame, text="Период:")
         self.period_label.pack(side="left", padx=10)
