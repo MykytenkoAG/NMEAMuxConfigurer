@@ -100,14 +100,12 @@ class SerialApp:
         # Заголовок таблицы
         header_frame = tk.Frame(self.nmea_scrollable_frame)
         header_frame.pack(fill="x", pady=2)
-        tk.Label(header_frame, text="Sentence ID", width=10, anchor="w").pack(side="left", padx=5)
+        tk.Label(header_frame, text="Sentence ID").pack(side="left", padx=5)
         tk.Label(header_frame, text=f"In", width=5).pack(side="left", padx=7)
         tk.Label(header_frame, text=f"Out", width=5).pack(side="left", padx=7)
         tk.Label(header_frame, text=f"Conv", width=5).pack(side="left", padx=7)
         tk.Label(header_frame, text=f"Forced", width=5).pack(side="left", padx=7)
         tk.Label(header_frame, text=f"Calc", width=5).pack(side="left", padx=7)
-        # for i in range(1, 6):
-        #     tk.Label(header_frame, text=f"Опция {i}", width=10).pack(side="left")
 
         # Данные NMEA
         self.nmea_sentences = [
@@ -191,6 +189,8 @@ class SerialApp:
         self.output_text.yview("end")
 
 if __name__ == "__main__":
+    import ReadConfig
+    
     root = tk.Tk()
     app = SerialApp(root)
     root.mainloop()
