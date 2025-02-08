@@ -9,14 +9,14 @@ from ReadConfig import data
 class SerialApp:
     def __init__(self, root, data):
         self.root = root
-        self.data = data
+        self.data = data                                #   массив со словарями, созданный из текстового файла конфигурации
         self.checkbuttons = dict()
         self.root.title("MUX Configurer")
         
         # Переменные
         self.serial_port = None
         self.running = False
-        self.selected_channel = tk.IntVar(value=1)  # Выбранный канал по умолчанию
+        self.selected_channel = tk.IntVar(value=1)      # Выбранный канал по умолчанию
 
         # 1. Выбор COM-порта и кнопка отправки $MKHALT
         frame1 = tk.Frame(root, padx=10, pady=5)
@@ -72,15 +72,28 @@ class SerialApp:
         self.speed_label = tk.Label(self.config_frame, text="Скорость:")
         self.speed_label.pack(side="left")
 
-        self.speed_combobox = ttk.Combobox(self.config_frame, values=["4800", "9600", "38400", "115200"], state="readonly")
+        self.baudrates = ["4800", "9600", "38400", "115200"]
+        self.speed_combobox = ttk.Combobox(self.config_frame, values=self.baudrates, state="readonly")
         self.speed_combobox.pack(side="left", padx=5)
-        self.speed_combobox.current(0)  # По умолчанию 4800
+        self.speed_combobox.bind("<<ComboboxSelected>>", self.change_baudrate)
+        #   Определение скорости работы первого канала
+        for i in range(len(self.baudrates)):
+            if(self.baudrates[i]==self.data[0]["B"]):
+                self.speed_combobox.current(i)
 
         self.period_label = tk.Label(self.config_frame, text="Период:")
         self.period_label.pack(side="left", padx=10)
 
-        self.period_entry = tk.Entry(self.config_frame, width=10)
-        self.period_entry.pack(side="left")
+        self.periods = ["0.01","0.1","0.5","1","2"]
+        self.period_combobox = ttk.Combobox(self.config_frame, values=self.periods, state="readonly")
+        self.period_combobox.pack(side="left")
+        self.period_combobox.bind("<<ComboboxSelected>>", self.change_period)
+        for i in range(len(self.periods)):
+            if(self.periods[i]==self.data[0]["T"]):
+                self.period_combobox.current(i)
+
+        self.period_label = tk.Label(self.config_frame, text="с")
+        self.period_label.pack(side="left", padx=10)
 
         # 4.3 Список NMEA 0183 предложений с 5 чекбоксами в строке и прокруткой
         self.nmea_frame = tk.Frame(root)
@@ -111,7 +124,7 @@ class SerialApp:
         tk.Label(header_frame, text=f"Forced", width=5).pack(side="left", padx=7)
         tk.Label(header_frame, text=f"Calc", width=5).pack(side="left", padx=7)
 
-        # Данные NMEA
+        # NMEA 0183 сообщения
         self.nmea_sentences = []
 
         for key in data[0].keys():
@@ -198,6 +211,14 @@ class SerialApp:
         self.output_text.config(state="disabled")
         self.output_text.yview("end")
 
+    def change_baudrate(self, event):
+        data_ind = self.selected_channel.get()-1
+        self.data[data_ind]["B"]=self.speed_combobox.get()
+
+    def change_period(self, event):
+        data_ind = self.selected_channel.get()-1
+        self.data[data_ind]["T"]=self.period_combobox.get()
+
     # Изменение настроек сообщения
     def change_sentence_mode(self, var, channel_num, sentence, cb_id):
         sentence_mode = self.data[channel_num][sentence]
@@ -208,9 +229,15 @@ class SerialApp:
         self.data[channel_num][sentence] = sentence_mode
         print(f"{sentence} : {self.data[channel_num][sentence]}")
 
-    # Отрисовка параметров для каждого сообщения при смене канала
+    # Перерисовка всех параметров при изменении канала
     def change_channel(self):
         data_ind = self.selected_channel.get()-1
+        for i in range(len(self.baudrates)):
+            if(self.baudrates[i]==self.data[data_ind]["B"]):
+                self.speed_combobox.current(i)
+        for i in range(len(self.periods)):
+            if(self.periods[i]==self.data[data_ind]["T"]):
+                self.period_combobox.current(i)
         for key in data[0].keys():
             if(key not in {"ChannelNumber", "B", "T"}):
                 for i in range(5):
