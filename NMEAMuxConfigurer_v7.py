@@ -10,6 +10,7 @@ class SerialApp:
     def __init__(self, root, data):
         self.root = root
         self.data = data
+        self.checkbuttons = dict()
         self.root.title("MUX Configurer")
         
         # Переменные
@@ -61,7 +62,7 @@ class SerialApp:
         self.channel_frame.pack(fill="x", pady=5, padx=10)
 
         for i in range(1, 9):
-            rb = ttk.Radiobutton(self.channel_frame, text=f"Канал {i}", variable=self.selected_channel, value=i)
+            rb = ttk.Radiobutton(self.channel_frame, text=f"Канал {i}", variable=self.selected_channel, value=i, command=self.change_channel)
             rb.pack(side="left", padx=5)
 
         # 4.2 Выбор скорости и поле "Период"
@@ -125,11 +126,13 @@ class SerialApp:
             tk.Label(row_frame, text=sentence, width=10, anchor="w").pack(side="left", padx=5)
 
             row_vars = []
+            self.checkbuttons[sentence]=[]
             for _ in range(5):
                 var = tk.BooleanVar()
                 row_vars.append(var)
-                chk = tk.Checkbutton(row_frame, variable=var)
+                chk = tk.Checkbutton(row_frame, variable=var, command=lambda v=var, id=_, sentence=sentence, channel_num=0: self.change_sentence_mode(v, channel_num, sentence, id))
                 chk.pack(side="left", padx=5)
+                self.checkbuttons[sentence].append(chk)
                 if(data[0][sentence][_]=="1"):
                     chk.select()
 
@@ -194,6 +197,27 @@ class SerialApp:
         self.output_text.insert("end", message + "\n")
         self.output_text.config(state="disabled")
         self.output_text.yview("end")
+
+    # Изменение настроек сообщения
+    def change_sentence_mode(self, var, channel_num, sentence, cb_id):
+        sentence_mode = self.data[channel_num][sentence]
+        if(var.get()):
+            sentence_mode=sentence_mode[:cb_id]+"1"+sentence_mode[cb_id+1:]
+        else:
+            sentence_mode=sentence_mode[:cb_id]+"0"+sentence_mode[cb_id+1:]
+        self.data[channel_num][sentence] = sentence_mode
+        print(f"{sentence} : {self.data[channel_num][sentence]}")
+
+    # Отрисовка параметров для каждого сообщения при смене канала
+    def change_channel(self):
+        data_ind = self.selected_channel.get()-1
+        for key in data[0].keys():
+            if(key not in {"ChannelNumber", "B", "T"}):
+                for i in range(5):
+                    if(self.data[data_ind][key][i]=="1"):
+                        self.checkbuttons[key][i].select()
+                    else:
+                        self.checkbuttons[key][i].deselect()
 
 if __name__ == "__main__":
     import ReadConfig
