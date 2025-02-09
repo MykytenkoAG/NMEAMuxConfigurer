@@ -4,7 +4,7 @@ import serial
 import serial.tools.list_ports
 import threading
 import ReadConfig
-from ReadConfig import data
+from ReadConfig import data, parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
     def __init__(self, root, data):
@@ -34,10 +34,10 @@ class SerialApp:
         self.send_mkhalt_button = tk.Button(frame1, text="Отправить $MKHALT", command=self.send_mkhalt, state="disabled")
         self.send_mkhalt_button.pack(side="left", padx=5)
 
-        self.download_from_mux = tk.Button(frame1, text="Скачать конфигурацию", command=self.send_mkhalt, state="disabled")
+        self.download_from_mux = tk.Button(frame1, text="Скачать конфигурацию", command=self.download_config)
         self.download_from_mux.pack(side="left", padx=5)
         
-        self.upload_to_mux = tk.Button(frame1, text="Загрузить конфигурацию", command=self.send_mkhalt, state="disabled")
+        self.upload_to_mux = tk.Button(frame1, text="Загрузить конфигурацию", command=self.upload_config)
         self.upload_to_mux.pack(side="left", padx=5)
 
         # 2. Ввод текста и кнопка отправки
@@ -211,10 +211,12 @@ class SerialApp:
         self.output_text.config(state="disabled")
         self.output_text.yview("end")
 
+    # Изменение скорости работы канала
     def change_baudrate(self, event):
         data_ind = self.selected_channel.get()-1
         self.data[data_ind]["B"]=self.speed_combobox.get()
 
+    # Изменение периода отправки сообщений
     def change_period(self, event):
         data_ind = self.selected_channel.get()-1
         self.data[data_ind]["T"]=self.period_combobox.get()
@@ -232,12 +234,15 @@ class SerialApp:
     # Перерисовка всех параметров при изменении канала
     def change_channel(self):
         data_ind = self.selected_channel.get()-1
+        # Перерисовка скорости
         for i in range(len(self.baudrates)):
             if(self.baudrates[i]==self.data[data_ind]["B"]):
                 self.speed_combobox.current(i)
+        # Перерисовка периода отправки
         for i in range(len(self.periods)):
             if(self.periods[i]==self.data[data_ind]["T"]):
                 self.period_combobox.current(i)
+        # Перерисовка настроек сообщений
         for key in data[0].keys():
             if(key not in {"ChannelNumber", "B", "T"}):
                 for i in range(5):
@@ -246,8 +251,14 @@ class SerialApp:
                     else:
                         self.checkbuttons[key][i].deselect()
 
+    def download_config(self):
+        pass
+
+    def upload_config(self):
+        write_mkprg_file(self.data, "new_config")
+
 if __name__ == "__main__":
-    import ReadConfig
+    # import ReadConfig
     
     root = tk.Tk()
     app = SerialApp(root, data)
