@@ -4,6 +4,8 @@ import serial
 import serial.tools.list_ports
 import threading
 import ReadConfig
+import os
+import time
 from ReadConfig import data, parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
@@ -15,6 +17,7 @@ class SerialApp:
         
         # Переменные
         self.serial_port = None
+        self.lock = threading.Lock()
         self.running = False
         self.selected_channel = tk.IntVar(value=1)      # Выбранный канал по умолчанию
 
@@ -167,7 +170,7 @@ class SerialApp:
             return
 
         try:
-            self.serial_port = serial.Serial(port, baudrate=9600, timeout=1)
+            self.serial_port = serial.Serial(port, baudrate=38400, timeout=1)
             self.running = True
             self.send_mkhalt_button.config(state="normal")
             self.send_text_button.config(state="normal")
@@ -251,15 +254,56 @@ class SerialApp:
                     else:
                         self.checkbuttons[key][i].deselect()
 
-    def download_config(self):
-        pass
+    def download_config(self, filename="temp/config.txt"):
+        if not self.serial_port or not self.serial_port.is_open:
+            print("Ошибка: COM-порт не открыт")
+            return
+
+        try:
+            with self.lock:  # Блокируем работу с COM-портом
+                self.serial_port.reset_input_buffer()  # Очищаем буфер перед началом работы
+
+                # 1. Отправка команды на скачивание конфигурации
+                command = "$MKPRG,CFG:B\n"
+                self.serial_port.write(command.encode())
+                print(f"Отправлена команда: {command.strip()}")
+
+                # 2. Ожидание сообщения "Press Enter when ready:"
+                response = ""
+                # while "ready:\n" not in response:
+                #     response = self.serial_port.readline().decode(errors="ignore").strip()
+                #     print(f"Получено: {response}")  # Для отладки
+
+                # 3. Отправка "\n" (символ Enter)
+                time.sleep(1)
+
+                self.serial_port.write(b"\n")
+                print("Отправлен Enter")
+
+                # 4. Чтение 8 строк конфигурации
+                lines = []
+                for _ in range(8):
+                    line = self.serial_port.readline().decode(errors="ignore").replace("Press ENTER when ready :", "").strip()
+                    lines.append(line)
+                    print(f"Принято: {line}")  # Для отладки
+
+            # 5. Сохранение в файл
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            with open(filename, "w", encoding="utf-8") as file:
+                file.write("\n".join(lines))
+
+            print(f"Файл сохранен: {filename}")
+
+        except serial.SerialException as e:
+            print(f"Ошибка работы с COM-портом: {e}")
+        except Exception as e:
+            print(f"Ошибка: {e}")
+
 
     def upload_config(self):
         write_mkprg_file(self.data, "new_config")
 
-if __name__ == "__main__":
-    # import ReadConfig
-    
+if __name__ == "__main__":    
     root = tk.Tk()
     app = SerialApp(root, data)
     root.mainloop()
