@@ -3,7 +3,6 @@ from tkinter import ttk
 import serial
 import serial.tools.list_ports
 import threading
-import ReadConfig
 import os
 import time
 from ReadConfig import data, parse_mkprg_file, write_mkprg_file
@@ -303,9 +302,29 @@ class SerialApp:
         except Exception as e:
             print(f"Ошибка: {e}")
 
-
     def upload_config(self):
-        write_mkprg_file(self.data, "new_config")
+        new_config = "temp/new_config.txt"
+        write_mkprg_file(self.data, new_config)
+
+        if not self.serial_port or not self.serial_port.is_open:
+            print("Ошибка: COM-порт не открыт")
+            return
+
+        try:
+            with open(new_config, "r", encoding="utf-8") as file:
+                lines = file.readlines()
+
+            for line in lines:
+                self.serial_port.write((line.strip() + "\r\n").encode())  # Отправляем строку с CRLF
+                time.sleep(0.1)  # Даем устройству время обработать данные
+                print(f"Отправлено: {line.strip()}")  # Для отладки
+
+            print("Файл успешно отправлен через COM-порт")
+
+        except FileNotFoundError:
+            print(f"Ошибка: файл {new_config} не найден")
+        except serial.SerialException as e:
+            print(f"Ошибка работы с COM-портом: {e}")
 
 if __name__ == "__main__":    
     root = tk.Tk()
