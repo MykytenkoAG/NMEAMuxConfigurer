@@ -101,11 +101,25 @@ class SerialApp:
         self.nmea_frame = tk.Frame(root)
         self.nmea_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
+        # Фрейм для заголовков (не прокручивается)
+        self.header_frame = tk.Frame(self.nmea_frame)
+        self.header_frame.pack(fill="x")
+
+        # Заголовки таблицы
+        headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
+        for col, header in enumerate(headers):
+            label = tk.Label(self.header_frame, text=header, width=15, anchor="center", relief="solid", borderwidth=1)
+            label.grid(row=0, column=col, padx=5, pady=2, sticky="nsew")
+
+        # Настройка одинаковой ширины столбцов для заголовков
+        for col in range(len(headers)):
+            self.header_frame.grid_columnconfigure(col, weight=1, uniform="column")
+
+        # Фрейм для содержимого таблицы (прокручивается)
         self.nmea_canvas = tk.Canvas(self.nmea_frame)
         self.nmea_scrollbar = ttk.Scrollbar(self.nmea_frame, orient="vertical", command=self.nmea_canvas.yview)
 
         self.nmea_scrollable_frame = tk.Frame(self.nmea_canvas)
-
         self.nmea_scrollable_frame.bind(
             "<Configure>", lambda e: self.nmea_canvas.configure(scrollregion=self.nmea_canvas.bbox("all"))
         )
@@ -116,43 +130,40 @@ class SerialApp:
         self.nmea_canvas.pack(side="left", fill="both", expand=True)
         self.nmea_scrollbar.pack(side="right", fill="y")
 
-        # Заголовок таблицы
-        header_frame = tk.Frame(self.nmea_scrollable_frame)
-        header_frame.pack(fill="x", pady=2)
-        tk.Label(header_frame, text="Sentence ID").pack(side="left", padx=5)
-        tk.Label(header_frame, text=f"In", width=5).pack(side="left", padx=7)
-        tk.Label(header_frame, text=f"Out", width=5).pack(side="left", padx=7)
-        tk.Label(header_frame, text=f"Conv", width=5).pack(side="left", padx=7)
-        tk.Label(header_frame, text=f"Forced", width=5).pack(side="left", padx=7)
-        tk.Label(header_frame, text=f"Calc", width=5).pack(side="left", padx=7)
+        # Настройка одинаковой ширины столбцов для содержимого
+        for col in range(len(headers)):
+            self.nmea_scrollable_frame.grid_columnconfigure(col, weight=1, uniform="column")
 
-        # NMEA 0183 сообщения
-        self.nmea_sentences = []
-
-        for key in self.data[0].keys():
-            if(key not in {"ChannelNumber", "B", "T"}):
-                self.nmea_sentences.append(key)
+        # Создание таблицы с чекбоксами
+        self.nmea_sentences = [key for key in self.data[0].keys() if key not in {"ChannelNumber", "B", "T"}]
 
         self.nmea_vars = []
-        for sentence in self.nmea_sentences:
-            row_frame = tk.Frame(self.nmea_scrollable_frame)
-            row_frame.pack(fill="x", pady=2)
+        self.checkbuttons = dict()
 
-            tk.Label(row_frame, text=sentence, width=10, anchor="w").pack(side="left", padx=5)
+        for row, sentence in enumerate(self.nmea_sentences, start=1):
+            # Sentence ID
+            label = tk.Label(self.nmea_scrollable_frame, text=sentence, width=15, anchor="center", relief="solid", borderwidth=1)
+            label.grid(row=row, column=0, padx=5, pady=2, sticky="nsew")
 
+            # Чекбоксы для каждого столбца
             row_vars = []
-            self.checkbuttons[sentence]=[]
-            for _ in range(5):
+            self.checkbuttons[sentence] = []
+            for col in range(1, 6):  # 5 столбцов: In, Out, Conv, Forced, Calc
                 var = tk.BooleanVar()
                 row_vars.append(var)
-                chk = tk.Checkbutton(row_frame, variable=var, command=lambda v=var, id=_, sentence=sentence, channel_num=0: self.change_sentence_mode(v, channel_num, sentence, id))
-                chk.pack(side="left", padx=5)
+                chk = tk.Checkbutton(
+                    self.nmea_scrollable_frame, variable=var,
+                    command=lambda v=var, id=col-1, sentence=sentence, channel_num=0: self.change_sentence_mode(v, channel_num, sentence, id)
+                )
+                chk.grid(row=row, column=col, padx=5, pady=2, sticky="nsew")
                 self.checkbuttons[sentence].append(chk)
-                if(self.data[0][sentence][_]=="1"):
+
+                # Установка состояния чекбокса на основе данных конфигурации
+                if self.data[0][sentence][col-1] == "1":
                     chk.select()
 
             self.nmea_vars.append(row_vars)
-
+ 
     def get_com_ports(self):
         ports = serial.tools.list_ports.comports()
         return [port.device for port in ports]
@@ -189,7 +200,7 @@ class SerialApp:
 
     def send_mkhalt(self):
         if self.serial_port:
-            self.serial_port.write(b"$MKHALT\n")
+            self.serial_port.write(b"$MKHALT\n$MKHALT\n")
 
     def send_text(self):
         if self.serial_port:
