@@ -13,6 +13,7 @@ class SerialApp:
         self.data = parse_mkprg_file("configs/default_config.txt")
         self.checkbuttons = dict()
         self.root.title("MUX Configurer")
+        self.root.resizable(False, True)
         
         self.serial_port = None
         self.lock = threading.Lock()
@@ -96,19 +97,19 @@ class SerialApp:
         self.nmea_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         self.header_frame = tk.Frame(self.nmea_frame)
-        self.header_frame.pack(fill="x")
+        self.header_frame.pack()
 
         headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
         for col, header in enumerate(headers):
             label = tk.Label(self.header_frame, text=header, anchor="center", relief="solid", borderwidth=1)
-            label.grid(row=0, column=col, padx=5, pady=2, sticky="nsew")
-            self.header_frame.grid_columnconfigure(col, weight=1)
+            label.grid(row=0, column=col, padx=5, pady=2)
+            self.header_frame.grid_columnconfigure(col)
 
         # Заголовки таблицы
         headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
         for col, header in enumerate(headers):
             label = tk.Label(self.header_frame, text=header, width=15, anchor="center", relief="solid", borderwidth=1)
-            label.grid(row=0, column=col, padx=5, pady=2, sticky="nsew")
+            label.grid(row=0, column=col, padx=5, pady=2)
 
         # Настройка одинаковой ширины столбцов для заголовков
         for col in range(len(headers)):
@@ -275,13 +276,33 @@ class SerialApp:
                 self.serial_port.write(b"$MKPRG,CFG:B\n")
                 start_time = time.time()
                 response = ""
-                while "ready :" not in response:
-                    if time.time() - start_time > 5:
-                        self.log_to_output("Превышен интервал ожидания")
-                        return
-                    response += self.serial_port.read(50).decode(errors="ignore")
+                # while ":" not in response:
+                #     if time.time() - start_time > 5:
+                #         self.log_to_output("Превышен интервал ожидания")
+                #         return
+                #     response += self.serial_port.read(50).decode(errors="ignore")
+
+                time.sleep(1)
 
                 self.serial_port.write(b"\n")
+
+                # 4. Чтение 8 строк конфигурации
+                lines = []
+                for _ in range(8):
+                    line = self.serial_port.readline().decode(errors="ignore").replace("Press ENTER when ready :", "").strip()
+                    lines.append(line)
+                    print(f"Принято: {line}")  # Для отладки
+                
+                # 5. Сохранение в файл
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write("\n".join(lines))
+
+                print(f"Файл сохранен: {filename}")
+
+            self.data = parse_mkprg_file(filename)
+            self.selected_channel.set(1)
+            self.change_channel()
 
         except serial.SerialException as e:
             self.log_to_output(f"Ошибка работы с COM-портом: {e}")
