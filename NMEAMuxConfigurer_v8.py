@@ -5,12 +5,12 @@ import serial.tools.list_ports
 import threading
 import os
 import time
-from ReadConfig import data, parse_mkprg_file, write_mkprg_file
+from ParseFiles import parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
-    def __init__(self, root, data):
+    def __init__(self, root):
         self.root = root
-        self.data = data                                #   массив со словарями, созданный из текстового файла конфигурации
+        self.data = parse_mkprg_file("configs/default_config.txt") #   массив со словарями, созданный из текстового файла конфигурации
         self.checkbuttons = dict()
         self.root.title("MUX Configurer")
         
@@ -129,7 +129,7 @@ class SerialApp:
         # NMEA 0183 сообщения
         self.nmea_sentences = []
 
-        for key in data[0].keys():
+        for key in self.data[0].keys():
             if(key not in {"ChannelNumber", "B", "T"}):
                 self.nmea_sentences.append(key)
 
@@ -148,7 +148,7 @@ class SerialApp:
                 chk = tk.Checkbutton(row_frame, variable=var, command=lambda v=var, id=_, sentence=sentence, channel_num=0: self.change_sentence_mode(v, channel_num, sentence, id))
                 chk.pack(side="left", padx=5)
                 self.checkbuttons[sentence].append(chk)
-                if(data[0][sentence][_]=="1"):
+                if(self.data[0][sentence][_]=="1"):
                     chk.select()
 
             self.nmea_vars.append(row_vars)
@@ -245,7 +245,7 @@ class SerialApp:
             if(self.periods[i]==self.data[data_ind]["T"]):
                 self.period_combobox.current(i)
         # Перерисовка настроек сообщений
-        for key in data[0].keys():
+        for key in self.data[0].keys():
             if(key not in {"ChannelNumber", "B", "T"}):
                 for i in range(5):
                     if(self.data[data_ind][key][i]=="1"):
@@ -253,7 +253,8 @@ class SerialApp:
                     else:
                         self.checkbuttons[key][i].deselect()
 
-    def download_config(self, filename="temp/config.txt"):
+    # Загрузить конфигурацию с мультиплексора
+    def download_config(self, filename="configs/current_config.txt"):
         if not self.serial_port or not self.serial_port.is_open:
             print("Ошибка: COM-порт не открыт")
             return
@@ -302,8 +303,9 @@ class SerialApp:
         except Exception as e:
             print(f"Ошибка: {e}")
 
+    # Загрузить конфигурацию в мультиплексор
     def upload_config(self):
-        new_config = "temp/new_config.txt"
+        new_config = "configs/new_config.txt"
         write_mkprg_file(self.data, new_config)
 
         if not self.serial_port or not self.serial_port.is_open:
@@ -328,5 +330,5 @@ class SerialApp:
 
 if __name__ == "__main__":    
     root = tk.Tk()
-    app = SerialApp(root, data)
+    app = SerialApp(root)
     root.mainloop()

@@ -3,10 +3,10 @@ from tkinter import ttk
 import serial
 import serial.tools.list_ports
 import threading
-import ReadConfig
+import ParseFiles
 import os
 import time
-from ReadConfig import data, parse_mkprg_file, write_mkprg_file
+from ParseFiles import data, parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
     def __init__(self, root, data):

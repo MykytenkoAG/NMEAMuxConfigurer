@@ -1,5 +1,3 @@
-import json
-
 def parse_mkprg_file(filename):
     data = []
     with open(filename, 'r', encoding='utf-8') as file:
@@ -11,10 +9,7 @@ def parse_mkprg_file(filename):
                 entry['ChannelNumber'] = int(parts[2])
                 for item in parts[3:]:
                     key, value = item.split(':')
-                    if key in ['B', 'T']:
-                        entry[key] = value
-                    else:
-                        entry[key] = value
+                    entry[key] = value
                 data.append(entry)
     return data
 
@@ -27,14 +22,3 @@ def write_mkprg_file(data, filename):
                 if key != 'ChannelNumber':
                     line_parts.append(f"{key}:{value}")
             file.write(','.join(line_parts) + '\n')
-
-# Пример использования
-input_filename = "default_config.txt"  # Исходный файл
-output_filename = "output.txt"  # Файл для записи
-
-# Чтение и разбор файла
-data = parse_mkprg_file(input_filename)
-print(json.dumps(data, indent=4))
-
-# Запись обратно в файл
-write_mkprg_file(data, output_filename)
