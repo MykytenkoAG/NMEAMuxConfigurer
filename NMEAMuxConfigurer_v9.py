@@ -10,24 +10,22 @@ from ParseFiles import parse_mkprg_file, write_mkprg_file
 class SerialApp:
     def __init__(self, root):
         self.root = root
-        self.data = parse_mkprg_file("configs/default_config.txt") #   массив со словарями, созданный из текстового файла конфигурации
+        self.data = parse_mkprg_file("configs/default_config.txt")
         self.checkbuttons = dict()
         self.root.title("MUX Configurer")
         
-        # Переменные
         self.serial_port = None
         self.lock = threading.Lock()
         self.running = False
-        self.selected_channel = tk.IntVar(value=1)      # Выбранный канал по умолчанию
+        self.selected_channel = tk.IntVar(value=1)
 
-        # 1. Выбор COM-порта и кнопка отправки $MKHALT
         frame1 = tk.Frame(root, padx=10, pady=5)
         frame1.pack(fill="x")
 
         self.com_label = tk.Label(frame1, text="COM Port:")
         self.com_label.pack(side="left")
 
-        self.com_combobox = ttk.Combobox(frame1, values=self.get_com_ports(), state="readonly")
+        self.com_combobox = ttk.Combobox(frame1, values=sorted(self.get_com_ports()), state="readonly", width=10)
         self.com_combobox.pack(side="left", padx=5)
 
         self.connect_button = tk.Button(frame1, text="Open", command=self.toggle_connection)
@@ -42,24 +40,21 @@ class SerialApp:
         self.upload_to_mux = tk.Button(frame1, text="Write to MUX", command=self.upload_config)
         self.upload_to_mux.pack(side="left", padx=5)
 
-        # 2. Ввод текста и кнопка отправки
         frame2 = tk.Frame(root, padx=10, pady=5)
         frame2.pack(fill="x")
 
-        self.input_entry = tk.Entry(frame2, width=50)
-        self.input_entry.pack(side="left", padx=5)
+        self.input_entry = tk.Entry(frame2, width=40)
+        self.input_entry.pack(side="left", padx=5, fill="x", expand=True)
 
         self.send_text_button = tk.Button(frame2, text="Send", command=self.send_text, state="disabled")
-        self.send_text_button.pack(side="left", padx=5)
+        self.send_text_button.pack(side="left", padx=5, fill="x")
 
-        # 3. Поле для приема данных
         frame3 = tk.Frame(root, padx=10, pady=5)
         frame3.pack(fill="both", expand=True)
 
         self.output_text = tk.Text(frame3, height=10, state="disabled")
         self.output_text.pack(fill="both", expand=True)
 
-        # 4.1 Кнопки "Канал 1" – "Канал 8"
         self.channel_frame = tk.LabelFrame(root, text="Channel selection")
         self.channel_frame.pack(fill="x", pady=5, padx=10)
 
@@ -67,7 +62,6 @@ class SerialApp:
             rb = ttk.Radiobutton(self.channel_frame, text=f"Channel {i}", variable=self.selected_channel, value=i, command=self.change_channel)
             rb.pack(side="left", padx=5)
 
-        # 4.2 Выбор скорости и поле "Период"
         self.config_frame = tk.Frame(root)
         self.config_frame.pack(fill="x", pady=5)
 
@@ -75,35 +69,40 @@ class SerialApp:
         self.speed_label.pack(side="left")
 
         self.baudrates = ["4800", "9600", "38400", "115200"]
-        self.speed_combobox = ttk.Combobox(self.config_frame, values=self.baudrates, state="readonly")
+        self.speed_combobox = ttk.Combobox(self.config_frame, values=self.baudrates, state="readonly", width=7)
         self.speed_combobox.pack(side="left", padx=5)
         self.speed_combobox.bind("<<ComboboxSelected>>", self.change_baudrate)
-        #   Определение скорости работы первого канала
+
         for i in range(len(self.baudrates)):
-            if(self.baudrates[i]==self.data[0]["B"]):
+            if self.baudrates[i] == self.data[0]["B"]:
                 self.speed_combobox.current(i)
 
         self.period_label = tk.Label(self.config_frame, text="Period:")
         self.period_label.pack(side="left", padx=10)
 
-        self.periods = ["0.01","0.1","0.5","1","2"]
-        self.period_combobox = ttk.Combobox(self.config_frame, values=self.periods, state="readonly")
+        self.periods = ["0.01", "0.1", "0.5", "1", "2"]
+        self.period_combobox = ttk.Combobox(self.config_frame, values=self.periods, state="readonly", width=5)
         self.period_combobox.pack(side="left")
         self.period_combobox.bind("<<ComboboxSelected>>", self.change_period)
+
         for i in range(len(self.periods)):
-            if(self.periods[i]==self.data[0]["T"]):
+            if self.periods[i] == self.data[0]["T"]:
                 self.period_combobox.current(i)
 
         self.period_label = tk.Label(self.config_frame, text="s")
         self.period_label.pack(side="left", padx=10)
 
-        # 4.3 Список NMEA 0183 предложений с 5 чекбоксами в строке и прокруткой
         self.nmea_frame = tk.Frame(root)
         self.nmea_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Фрейм для заголовков (не прокручивается)
         self.header_frame = tk.Frame(self.nmea_frame)
         self.header_frame.pack(fill="x")
+
+        headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
+        for col, header in enumerate(headers):
+            label = tk.Label(self.header_frame, text=header, anchor="center", relief="solid", borderwidth=1)
+            label.grid(row=0, column=col, padx=5, pady=2, sticky="nsew")
+            self.header_frame.grid_columnconfigure(col, weight=1)
 
         # Заголовки таблицы
         headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
@@ -163,11 +162,11 @@ class SerialApp:
                     chk.select()
 
             self.nmea_vars.append(row_vars)
- 
+
     def get_com_ports(self):
         ports = serial.tools.list_ports.comports()
-        return [port.device for port in ports]
-
+        return sorted([port.device for port in ports])
+    
     def toggle_connection(self):
         if self.serial_port:
             self.disconnect()
@@ -267,51 +266,25 @@ class SerialApp:
     # Загрузить конфигурацию с мультиплексора
     def download_config(self, filename="configs/current_config.txt"):
         if not self.serial_port or not self.serial_port.is_open:
-            print("Ошибка: COM-порт не открыт")
+            self.log_to_output("Ошибка: COM-порт не открыт")
             return
 
         try:
-            with self.lock:  # Блокируем работу с COM-портом
-                self.serial_port.reset_input_buffer()  # Очищаем буфер перед началом работы
-
-                # 1. Отправка команды на скачивание конфигурации
-                command = "$MKPRG,CFG:B\n"
-                self.serial_port.write(command.encode())
-                print(f"Отправлена команда: {command.strip()}")
-
-                # 2. Ожидание сообщения "Press Enter when ready:"
+            with self.lock:
+                self.serial_port.reset_input_buffer()
+                self.serial_port.write(b"$MKPRG,CFG:B\n")
+                start_time = time.time()
                 response = ""
-                while response.find("ready :")!=-1:
+                while "ready :" not in response:
+                    if time.time() - start_time > 5:
+                        self.log_to_output("Превышен интервал ожидания")
+                        return
                     response += self.serial_port.read(50).decode(errors="ignore")
 
-                self.serial_port.reset_input_buffer()
-                time.sleep(1)
-
                 self.serial_port.write(b"\n")
-                print("Отправлен Enter")
-
-                # 4. Чтение 8 строк конфигурации
-                lines = []
-                for _ in range(8):
-                    line = self.serial_port.readline().decode(errors="ignore").replace("Press ENTER when ready :", "").strip()
-                    lines.append(line)
-                    print(f"Принято: {line}")  # Для отладки
-
-            # 5. Сохранение в файл
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            with open(filename, "w", encoding="utf-8") as file:
-                file.write("\n".join(lines))
-
-            print(f"Файл сохранен: {filename}")
-
-            self.data = parse_mkprg_file(filename)
-            self.selected_channel.set(1)
-            self.change_channel()
 
         except serial.SerialException as e:
-            print(f"Ошибка работы с COM-портом: {e}")
-        except Exception as e:
-            print(f"Ошибка: {e}")
+            self.log_to_output(f"Ошибка работы с COM-портом: {e}")
 
     # Загрузить конфигурацию в мультиплексор
     def upload_config(self):
