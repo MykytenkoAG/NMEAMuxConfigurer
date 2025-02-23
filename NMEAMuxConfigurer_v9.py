@@ -29,16 +29,16 @@ class SerialApp:
         self.com_combobox = ttk.Combobox(frame1, values=sorted(self.get_com_ports()), state="readonly", width=10)
         self.com_combobox.pack(side="left", padx=5)
 
-        self.connect_button = tk.Button(frame1, text="Open", command=self.toggle_connection)
+        self.connect_button = tk.Button(frame1, text="Open", command=self.toggle_connection, width="15")
         self.connect_button.pack(side="left", padx=5)
 
-        self.send_mkhalt_button = tk.Button(frame1, text="HALT", command=self.send_mkhalt, state="disabled")
+        self.send_mkhalt_button = tk.Button(frame1, text="HALT", command=self.send_mkhalt, state="disabled", width="15")
         self.send_mkhalt_button.pack(side="left", padx=5)
 
-        self.download_from_mux = tk.Button(frame1, text="Read from MUX", command=self.download_config)
+        self.download_from_mux = tk.Button(frame1, text="Read from MUX", command=self.download_config, state="disabled", width="20")
         self.download_from_mux.pack(side="left", padx=5)
         
-        self.upload_to_mux = tk.Button(frame1, text="Write to MUX", command=self.upload_config)
+        self.upload_to_mux = tk.Button(frame1, text="Write to MUX", command=self.upload_config, state="disabled", width="20")
         self.upload_to_mux.pack(side="left", padx=5)
 
         frame2 = tk.Frame(root, padx=10, pady=5)
@@ -99,26 +99,19 @@ class SerialApp:
         self.header_frame = tk.Frame(self.nmea_frame)
         self.header_frame.pack()
 
-        headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
-        for col, header in enumerate(headers):
-            label = tk.Label(self.header_frame, text=header, anchor="center", relief="solid", borderwidth=1)
-            label.grid(row=0, column=col, padx=5, pady=2)
-            self.header_frame.grid_columnconfigure(col)
-
         # Заголовки таблицы
         headers = ["Sentence ID", "In", "Out", "Conv", "Forced", "Calc"]
         for col, header in enumerate(headers):
             label = tk.Label(self.header_frame, text=header, width=15, anchor="center", relief="solid", borderwidth=1)
             label.grid(row=0, column=col, padx=5, pady=2)
-
-        # Настройка одинаковой ширины столбцов для заголовков
-        for col in range(len(headers)):
             self.header_frame.grid_columnconfigure(col, weight=1, uniform="column")
 
         # Фрейм для содержимого таблицы (прокручивается)
         self.nmea_canvas = tk.Canvas(self.nmea_frame)
         self.nmea_scrollbar = ttk.Scrollbar(self.nmea_frame, orient="vertical", command=self.nmea_canvas.yview)
-
+        
+        self.nmea_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        
         self.nmea_scrollable_frame = tk.Frame(self.nmea_canvas)
         self.nmea_scrollable_frame.bind(
             "<Configure>", lambda e: self.nmea_canvas.configure(scrollregion=self.nmea_canvas.bbox("all"))
@@ -149,11 +142,13 @@ class SerialApp:
             row_vars = []
             self.checkbuttons[sentence] = []
             for col in range(1, 6):  # 5 столбцов: In, Out, Conv, Forced, Calc
+                if(sentence=="TID" and col>1):
+                    continue
                 var = tk.BooleanVar()
                 row_vars.append(var)
                 chk = tk.Checkbutton(
                     self.nmea_scrollable_frame, variable=var,
-                    command=lambda v=var, id=col-1, sentence=sentence, channel_num=0: self.change_sentence_mode(v, channel_num, sentence, id)
+                    command=lambda v=var, id=col-1, sentence=sentence, channel_num=self.selected_channel.get(): self.change_sentence_mode(v, channel_num, sentence, id)
                 )
                 chk.grid(row=row, column=col, padx=5, pady=2, sticky="nsew")
                 self.checkbuttons[sentence].append(chk)
@@ -163,6 +158,9 @@ class SerialApp:
                     chk.select()
 
             self.nmea_vars.append(row_vars)
+
+    def _on_mousewheel(self, event):
+        self.nmea_canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
     def get_com_ports(self):
         ports = serial.tools.list_ports.comports()
@@ -184,6 +182,8 @@ class SerialApp:
             self.running = True
             self.send_mkhalt_button.config(state="normal")
             self.send_text_button.config(state="normal")
+            self.download_from_mux.config(state="normal")
+            self.upload_to_mux.config(state="normal")
             self.connect_button.config(text="Close")
             threading.Thread(target=self.read_from_port, daemon=True).start()
         except serial.SerialException as e:
@@ -196,7 +196,9 @@ class SerialApp:
             self.serial_port = None
         self.send_mkhalt_button.config(state="disabled")
         self.send_text_button.config(state="disabled")
-        self.connect_button.config(text="Открыть")
+        self.download_from_mux.config(state="disabled")
+        self.upload_to_mux.config(state="disabled")
+        self.connect_button.config(text="Open")
 
     def send_mkhalt(self):
         if self.serial_port:
@@ -236,13 +238,13 @@ class SerialApp:
 
     # Изменение настроек сообщения
     def change_sentence_mode(self, var, channel_num, sentence, cb_id):
-        sentence_mode = self.data[channel_num][sentence]
+        data_ind = self.selected_channel.get()-1
+        sentence_mode = self.data[data_ind][sentence]
         if(var.get()):
             sentence_mode=sentence_mode[:cb_id]+"1"+sentence_mode[cb_id+1:]
         else:
             sentence_mode=sentence_mode[:cb_id]+"0"+sentence_mode[cb_id+1:]
-        self.data[channel_num][sentence] = sentence_mode
-        print(f"{sentence} : {self.data[channel_num][sentence]}")
+        self.data[data_ind][sentence] = sentence_mode
 
     # Перерисовка всех параметров при изменении канала
     def change_channel(self):
@@ -259,6 +261,8 @@ class SerialApp:
         for key in self.data[0].keys():
             if(key not in {"ChannelNumber", "B", "T"}):
                 for i in range(5):
+                    if(key=="TID" and i!=0):
+                        continue
                     if(self.data[data_ind][key][i]=="1"):
                         self.checkbuttons[key][i].select()
                     else:
@@ -274,31 +278,51 @@ class SerialApp:
             with self.lock:
                 self.serial_port.reset_input_buffer()
                 self.serial_port.write(b"$MKPRG,CFG:B\n")
-                start_time = time.time()
-                response = ""
-                # while ":" not in response:
-                #     if time.time() - start_time > 5:
-                #         self.log_to_output("Превышен интервал ожидания")
-                #         return
-                #     response += self.serial_port.read(50).decode(errors="ignore")
+                self.log_to_output("$MKPRG,CFG:B\n")
 
-                time.sleep(1)
+                # Ждем первые данные (максимум 3 сек)
+                timeout = time.time() + 3
+                while self.serial_port.in_waiting == 0:
+                    if time.time() > timeout:
+                        self.log_to_output("Ошибка: устройство не отвечает")
+                        return
+                    time.sleep(0.1)
 
                 self.serial_port.write(b"\n")
 
-                # 4. Чтение 8 строк конфигурации
+                # Чтение 8 строк с таймаутом
                 lines = []
                 for _ in range(8):
-                    line = self.serial_port.readline().decode(errors="ignore").replace("Press ENTER when ready :", "").strip()
-                    lines.append(line)
-                    print(f"Принято: {line}")  # Для отладки
-                
-                # 5. Сохранение в файл
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                with open(filename, "w", encoding="utf-8") as file:
-                    file.write("\n".join(lines))
+                    start_time = time.time()
+                    data = b""
+                    while time.time() - start_time < 2:  # Таймаут 2 секунды на строку
+                        if self.serial_port.in_waiting > 0:
+                            data += self.serial_port.read(self.serial_port.in_waiting)
+                            if b"\n" in data:
+                                break
+                        time.sleep(0.1)
 
-                print(f"Файл сохранен: {filename}")
+                    if not data:
+                        self.log_to_output("Ошибка: таймаут при чтении строки")
+                        return
+
+                    line = data.decode(errors="ignore").strip()
+                    if line:
+                        lines.append(line)
+                        self.log_to_output(line)
+               
+                # 5. Сохранение в файл
+                # Склеивание строк с пробелами между ними
+                config_text = "".join(lines).replace("Press ENTER when ready :", "").replace("\n","")
+
+                # Создание каталога, если нужно
+                dir_name = os.path.dirname(filename)
+                if dir_name:
+                    os.makedirs(dir_name, exist_ok=True)
+
+                # Сохранение в файл
+                with open(filename, "w", encoding="utf-8") as file:
+                    file.write(config_text)
 
             self.data = parse_mkprg_file(filename)
             self.selected_channel.set(1)
@@ -321,9 +345,9 @@ class SerialApp:
                 lines = file.readlines()
 
             for line in lines:
-                self.serial_port.write((line.strip() + "\r\n").encode())  # Отправляем строку с CRLF
-                time.sleep(0.1)  # Даем устройству время обработать данные
-                print(f"Отправлено: {line.strip()}")  # Для отладки
+                self.serial_port.write((line.strip() + "\r\n").encode())        # Отправляем строку с CRLF
+                time.sleep(0.1)                                                 # Даем устройству время обработать данные
+                print(f"Отправлено: {line.strip()}")                            # Для отладки
 
             print("Файл успешно отправлен через COM-порт")
 
