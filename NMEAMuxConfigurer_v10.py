@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 import serial
 import serial.tools.list_ports
 import threading
 import os
 import time
+from datetime import datetime
 from ParseFiles import parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
@@ -41,6 +42,21 @@ class SerialApp:
         self.upload_to_mux = tk.Button(frame1, text="Write to MUX", command=self.upload_config, state="disabled", width="20")
         self.upload_to_mux.pack(side="left", padx=5)
 
+        file_frame = tk.Frame(root, padx=10, pady=5)
+        file_frame.pack(fill="x")
+
+        self.file_entry = tk.Entry(file_frame, width=40)
+        self.file_entry.pack(side="left", padx=5, fill="x", expand=True)
+
+        self.browse_button = tk.Button(file_frame, text="Browse", command=self.browse_file, width="15")
+        self.browse_button.pack(side="left", padx=5)
+
+        self.update_config_button = tk.Button(file_frame, text="Update config from file", command=self.update_config, width="20")
+        self.update_config_button.pack(side="left", padx=5)
+
+        self.download_config_button = tk.Button(file_frame, text="Download config to PC", command=self.download_file, width="20")
+        self.download_config_button.pack(side="left", padx=5)
+
         frame2 = tk.Frame(root, padx=10, pady=5)
         frame2.pack(fill="x")
 
@@ -54,8 +70,11 @@ class SerialApp:
         frame3 = tk.Frame(root, padx=10, pady=5)
         frame3.pack(fill="both", expand=True)
 
-        self.output_text = tk.Text(frame3, height=10, state="disabled")
+        self.output_text = tk.Text(frame3, state="disabled")
         self.output_text.pack(fill="both", expand=True)
+        self.output_scrollbar = ttk.Scrollbar(self.output_text, orient="vertical", command=self.output_text.yview)
+        self.output_text.configure(yscrollcommand=self.output_scrollbar.set)
+        self.output_scrollbar.pack(side="right", fill="y")
 
         self.channel_frame = tk.LabelFrame(root, text="Channel selection")
         self.channel_frame.pack(fill="x", pady=5, padx=10)
@@ -356,6 +375,26 @@ class SerialApp:
             print(f"Ошибка: файл {new_config} не найден")
         except serial.SerialException as e:
             print(f"Ошибка работы с COM-портом: {e}")
+    
+    def browse_file(self):
+        filename = filedialog.askopenfilename()
+        if filename:
+            self.file_entry.delete(0, tk.END)
+            self.file_entry.insert(0, filename)
+
+    def update_config(self):
+        filename = self.file_entry.get()
+        if os.path.exists(filename):
+            self.data = parse_mkprg_file(filename)
+            self.selected_channel.set(1)
+            self.change_channel()
+
+    def download_file(self):
+        download_path = os.path.join(os.path.expanduser("~"), "Downloads", "config.txt")
+        os.makedirs(os.path.dirname(download_path), exist_ok=True)
+        with open("configs/new_config.txt", "r", encoding="utf-8") as src:
+            with open(download_path, "w", encoding="utf-8") as dest:
+                dest.write(src.read())
 
 if __name__ == "__main__":    
     root = tk.Tk()
