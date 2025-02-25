@@ -10,17 +10,22 @@ from ParseFiles import parse_mkprg_file, write_mkprg_file
 
 class SerialApp:
     def __init__(self, root):
+
         self.root = root
-        self.data = parse_mkprg_file("configs/default_config.txt")
-        self.checkbuttons = dict()
         self.root.title("MUX Configurer")
         self.root.resizable(False, True)
+
         
         self.serial_port = None
         self.lock = threading.Lock()
         self.running = False
+
+        self.data = parse_mkprg_file("configs/default_config.txt")
+        self.checkbuttons = dict()
+
         self.selected_channel = tk.IntVar(value=1)
 
+        # Фрейм с выбором COM-порта и кнопками скачивания и загрузки конфигурации
         frame1 = tk.Frame(root, padx=10, pady=5)
         frame1.pack(fill="x")
 
@@ -42,6 +47,7 @@ class SerialApp:
         self.upload_to_mux = tk.Button(frame1, text="Write to MUX", command=self.upload_config, state="disabled", width="20")
         self.upload_to_mux.pack(side="left", padx=5)
 
+        # Фрейм с выборами файлов конфигурации
         file_frame = tk.Frame(root, padx=10, pady=5)
         file_frame.pack(fill="x")
 
@@ -57,6 +63,7 @@ class SerialApp:
         self.download_config_button = tk.Button(file_frame, text="Download config to PC", command=self.download_file, width="20")
         self.download_config_button.pack(side="left", padx=5)
 
+        # Фрейм с полем ввода команд
         frame2 = tk.Frame(root, padx=10, pady=5)
         frame2.pack(fill="x")
 
@@ -67,6 +74,7 @@ class SerialApp:
         self.send_text_button = tk.Button(frame2, text="Send", command=self.send_text, state="disabled")
         self.send_text_button.pack(side="left", padx=5, fill="x")
 
+        # Фрейм с выходом COM-порта
         frame3 = tk.Frame(root, padx=10, pady=5)
         frame3.pack(fill="both", expand=True)
 
@@ -76,6 +84,7 @@ class SerialApp:
         self.output_text.configure(yscrollcommand=self.output_scrollbar.set)
         self.output_scrollbar.pack(side="right", fill="y")
 
+        # Фрейм с выбором канала
         self.channel_frame = tk.LabelFrame(root, text="Channel selection")
         self.channel_frame.pack(fill="x", pady=5, padx=10)
 
@@ -83,6 +92,7 @@ class SerialApp:
             rb = ttk.Radiobutton(self.channel_frame, text=f"Channel {i}", variable=self.selected_channel, value=i, command=self.change_channel)
             rb.pack(side="left", padx=5)
 
+        # Фрейм с настройкой скорости работы канала и периодом отправки сообщений
         self.config_frame = tk.Frame(root)
         self.config_frame.pack(fill="x", pady=5)
 
@@ -98,9 +108,6 @@ class SerialApp:
             if self.baudrates[i] == self.data[0]["B"]:
                 self.speed_combobox.current(i)
 
-        self.period_label = tk.Label(self.config_frame, text="Period:")
-        self.period_label.pack(side="left", padx=10)
-
         self.periods = ["0.01", "0.1", "0.5", "1", "2"]
         self.period_combobox = ttk.Combobox(self.config_frame, values=self.periods, state="readonly", width=5)
         self.period_combobox.pack(side="left")
@@ -110,9 +117,12 @@ class SerialApp:
             if self.periods[i] == self.data[0]["T"]:
                 self.period_combobox.current(i)
 
+        self.period_label = tk.Label(self.config_frame, text="Period:")
+        self.period_label.pack(side="left", padx=10)
         self.period_label = tk.Label(self.config_frame, text="s")
         self.period_label.pack(side="left", padx=10)
 
+        # Фрейм с настройками сообщений
         self.nmea_frame = tk.Frame(root)
         self.nmea_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -179,57 +189,52 @@ class SerialApp:
 
             self.nmea_vars.append(row_vars)
 
-    def _on_mousewheel(self, event):
-        self.nmea_canvas.yview_scroll(-1 * (event.delta // 120), "units")
-
+    # Получение списка доступных COM-портов
     def get_com_ports(self):
         ports = serial.tools.list_ports.comports()
         return sorted([port.device for port in ports])
     
+    # Открытие/закрытие соединения
     def toggle_connection(self):
         if self.serial_port:
             self.disconnect()
         else:
             self.connect()
 
+    # Содинение
+    # ! НЕОБХОДИМО ДОБАВИТЬ ВОЗМОЖНОСТЬ ВЫБИРАТЬ СКОРОСТЬ РАБОТЫ ПОРТА
     def connect(self):
         port = self.com_combobox.get()
         if not port:
             return
-
         try:
             self.serial_port = serial.Serial(port, baudrate=38400, timeout=1)
             self.running = True
+            # Разблокировка кнопок
             self.send_mkhalt_button.config(state="normal")
             self.send_text_button.config(state="normal")
             self.download_from_mux.config(state="normal")
             self.upload_to_mux.config(state="normal")
             self.connect_button.config(text="Close")
+            # Запуск функции чтения из порта выполняется в отдеьном потоке
             threading.Thread(target=self.read_from_port, daemon=True).start()
         except serial.SerialException as e:
             self.log_to_output(f"Ошибка: {e}")
 
+    # Закрытие соединения
     def disconnect(self):
         self.running = False
         if self.serial_port:
             self.serial_port.close()
             self.serial_port = None
+        # Блокировка кнопок
         self.send_mkhalt_button.config(state="disabled")
         self.send_text_button.config(state="disabled")
         self.download_from_mux.config(state="disabled")
         self.upload_to_mux.config(state="disabled")
         self.connect_button.config(text="Open")
 
-    def send_mkhalt(self):
-        if self.serial_port:
-            self.serial_port.write(b"$MKHALT\n$MKHALT\n")
-
-    def send_text(self, event=None):
-        if self.serial_port and self.serial_port.is_open:
-            text = self.input_entry.get().strip()
-            self.serial_port.write((text + "\n").encode("utf-8"))
-            self.input_entry.delete(0, tk.END)
-
+    # Чтение данных из порта и их отображение
     def read_from_port(self):
         while self.running:
             if self.serial_port and self.serial_port.in_waiting:
@@ -240,54 +245,26 @@ class SerialApp:
                 except UnicodeDecodeError:
                     pass
 
+    # Добавление текста в поле output_text
     def log_to_output(self, message):
         self.output_text.config(state="normal")
         self.output_text.insert("end", message + "\n")
         self.output_text.config(state="disabled")
         self.output_text.yview("end")
 
-    # Изменение скорости работы канала
-    def change_baudrate(self, event):
-        data_ind = self.selected_channel.get()-1
-        self.data[data_ind]["B"]=self.speed_combobox.get()
+    # Отправка 2х команд $MKHALT для остановки приема сообщений по каналам 2..8
+    def send_mkhalt(self):
+        if self.serial_port:
+            self.serial_port.write(b"$MKHALT\n$MKHALT\n")
 
-    # Изменение периода отправки сообщений
-    def change_period(self, event):
-        data_ind = self.selected_channel.get()-1
-        self.data[data_ind]["T"]=self.period_combobox.get()
+    # Отправка текста, набранного в поле ввода
+    def send_text(self, event=None):
+        if self.serial_port and self.serial_port.is_open:
+            text = self.input_entry.get().strip()
+            self.serial_port.write((text + "\n").encode("utf-8"))
+            self.input_entry.delete(0, tk.END)
 
-    # Изменение настроек сообщения
-    def change_sentence_mode(self, var, channel_num, sentence, cb_id):
-        data_ind = self.selected_channel.get()-1
-        sentence_mode = self.data[data_ind][sentence]
-        if(var.get()):
-            sentence_mode=sentence_mode[:cb_id]+"1"+sentence_mode[cb_id+1:]
-        else:
-            sentence_mode=sentence_mode[:cb_id]+"0"+sentence_mode[cb_id+1:]
-        self.data[data_ind][sentence] = sentence_mode
-
-    # Перерисовка всех параметров при изменении канала
-    def change_channel(self):
-        data_ind = self.selected_channel.get()-1
-        # Перерисовка скорости
-        for i in range(len(self.baudrates)):
-            if(self.baudrates[i]==self.data[data_ind]["B"]):
-                self.speed_combobox.current(i)
-        # Перерисовка периода отправки
-        for i in range(len(self.periods)):
-            if(self.periods[i]==self.data[data_ind]["T"]):
-                self.period_combobox.current(i)
-        # Перерисовка настроек сообщений
-        for key in self.data[0].keys():
-            if(key not in {"ChannelNumber", "B", "T"}):
-                for i in range(5):
-                    if(key=="TID" and i!=0):
-                        continue
-                    if(self.data[data_ind][key][i]=="1"):
-                        self.checkbuttons[key][i].select()
-                    else:
-                        self.checkbuttons[key][i].deselect()
-
+    # НАСТРОКА МУЛЬТИПЛЕКСОРА -----------------------------------------------------------------------
     # Загрузить конфигурацию с мультиплексора
     def download_config(self, filename="configs/current_config.txt"):
         if not self.serial_port or not self.serial_port.is_open:
@@ -375,13 +352,61 @@ class SerialApp:
             print(f"Ошибка: файл {new_config} не найден")
         except serial.SerialException as e:
             print(f"Ошибка работы с COM-портом: {e}")
-    
+
+    # Перерисовка всех параметров при изменении канала
+    def change_channel(self):
+        data_ind = self.selected_channel.get()-1
+        # Перерисовка скорости
+        for i in range(len(self.baudrates)):
+            if(self.baudrates[i]==self.data[data_ind]["B"]):
+                self.speed_combobox.current(i)
+        # Перерисовка периода отправки
+        for i in range(len(self.periods)):
+            if(self.periods[i]==self.data[data_ind]["T"]):
+                self.period_combobox.current(i)
+        # Перерисовка настроек сообщений
+        for key in self.data[0].keys():
+            if(key not in {"ChannelNumber", "B", "T"}):
+                for i in range(5):
+                    if(key=="TID" and i!=0):
+                        continue
+                    if(self.data[data_ind][key][i]=="1"):
+                        self.checkbuttons[key][i].select()
+                    else:
+                        self.checkbuttons[key][i].deselect()
+
+    # Прокручивание таблицы с чекбоксами при прокручивании колесика мыши
+    def _on_mousewheel(self, event):
+        self.nmea_canvas.yview_scroll(-1 * (event.delta // 120), "units")
+
+    # Изменение скорости работы канала
+    def change_baudrate(self, event):
+        data_ind = self.selected_channel.get()-1
+        self.data[data_ind]["B"]=self.speed_combobox.get()
+
+    # Изменение периода отправки сообщений
+    def change_period(self, event):
+        data_ind = self.selected_channel.get()-1
+        self.data[data_ind]["T"]=self.period_combobox.get()
+
+    # Изменение настроек сообщения
+    def change_sentence_mode(self, var, channel_num, sentence, cb_id):
+        data_ind = self.selected_channel.get()-1
+        sentence_mode = self.data[data_ind][sentence]
+        if(var.get()):
+            sentence_mode=sentence_mode[:cb_id]+"1"+sentence_mode[cb_id+1:]
+        else:
+            sentence_mode=sentence_mode[:cb_id]+"0"+sentence_mode[cb_id+1:]
+        self.data[data_ind][sentence] = sentence_mode
+
+    # Выбор файла с конфигурацией
     def browse_file(self):
         filename = filedialog.askopenfilename()
         if filename:
             self.file_entry.delete(0, tk.END)
             self.file_entry.insert(0, filename)
 
+    # Обновление конфигурации из загруженного файла
     def update_config(self):
         filename = self.file_entry.get()
         if os.path.exists(filename):
@@ -389,6 +414,7 @@ class SerialApp:
             self.selected_channel.set(1)
             self.change_channel()
 
+    # Скачать текущую конфигурацию
     def download_file(self):
         download_path = os.path.join(os.path.expanduser("~"), "Downloads", "config.txt")
         os.makedirs(os.path.dirname(download_path), exist_ok=True)
